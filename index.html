@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>海鸟 · NFC音乐相册</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui, -apple-system, sans-serif;}
+body{
+  min-height:100vh;
+  background:#0a0a0a;
+  background-size:cover;
+  background-position:center;
+  background-attachment:fixed;
+  color:#fff;
+  padding:20px;
+}
+.wrap{
+  max-width:800px;
+  margin:0 auto;
+  background:rgba(0,0,0,0.72);
+  padding:28px;
+  border-radius:20px;
+  backdrop-filter: blur(10px);
+}
+h1{text-align:center;margin-bottom:12px;font-size:28px;}
+.desc{text-align:center;opacity:0.8;margin-bottom:30px;line-height:1.6;}
+.section{margin:30px 0;padding:20px;background:rgba(255,255,255,0.08);border-radius:16px;}
+h3{margin-bottom:16px;color:#f8f8f8;font-size:20px;}
+
+/* 唱片样式 */
+.vinyl-box{
+  width:240px;height:240px;
+  margin:0 auto 24px;
+  position:relative;
+}
+.vinyl{
+  width:100%;height:100%;
+  border-radius:50%;
+  background:#222;
+  position:relative;
+  overflow:hidden;
+}
+.vinyl.playing{
+  animation: rotate 8s linear infinite;
+}
+@keyframes rotate{
+  from{transform:rotate(0deg);}
+  to{transform:rotate(360deg);}
+}
+.vinyl-cover{
+  width:110px;height:110px;
+  border-radius:50%;
+  position:absolute;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  object-fit:cover;
+}
+.vinyl::before{
+  content:"";
+  width:18px;height:18px;
+  background:#000;border-radius:50%;
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:2;
+}
+
+/* 播放器区域 */
+.player-area{text-align:center;}
+.play-btn{
+  padding:14px 32px;font-size:18px;border:none;border-radius:50px;
+  background:#f05b72;color:#fff;font-weight:bold;cursor:pointer;margin:10px 0;
+}
+audio{width:100%;margin:12px 0;}
+.download-btn{
+  padding:8px 16px;border-radius:8px;border:none;background:#348ede;color:#fff;cursor:pointer;
+  text-decoration:none;display:inline-block;margin-top:8px;
+}
+
+/* 歌曲卡片 */
+.song-item{
+  display:flex;gap:16px;align-items:center;
+  background:rgba(255,255,255,0.1);
+  padding:16px;border-radius:12px;margin:14px 0;
+}
+.song-cover{width:72px;height:72px;border-radius:8px;object-fit:cover;}
+.song-info{flex:1;}
+.song-name{font-size:18px;margin-bottom:6px;}
+.link-row{display:flex;gap:8px;margin-top:8px;}
+.link-row input{flex:1;padding:8px;border-radius:6px;border:none;background:#222;color:#fff;}
+.link-row button{padding:8px 10px;border:none;border-radius:6px;background:#4285f4;color:#fff;cursor:pointer;}
+
+/* 相册 */
+.photo-grid{
+  display:grid;grid-template-columns:repeat(auto-fill, minmax(140px,1fr));gap:12px;
+}
+.photo-grid img{width:100%;border-radius:10px;aspect-ratio:1/1;object-fit:cover;}
+
+/* 管理面板（仅你自己用，粉丝打开看不到） */
+.admin-panel{border:1px solid #666;}
+input[type="file"],input[type="text"],textarea{
+  width:100%;padding:10px;margin:8px 0;border-radius:8px;border:none;background:#222;color:#fff;
+}
+button{padding:10px 14px;border:none;border-radius:8px;background:#2ea863;color:white;cursor:pointer;margin:4px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎵 海鸟 · NFC音乐相册</h1>
+  <p class="desc">感谢每一位支持我的粉丝<br>触碰NFC开启这份专属音乐礼物</p>
+
+  <!-- 唱片播放器区域（单歌播放页会显示这里） -->
+  <div id="playerView" class="player-area" style="display:none;">
+    <div class="vinyl-box">
+      <div class="vinyl" id="vinyl">
+        <img class="vinyl-cover" id="mainCover">
+      </div>
+    </div>
+    <h2 id="playerSongName"></h2>
+    <button class="play-btn" id="bigPlayBtn">点击播放</button>
+    <audio id="mainAudio" controls>
+    <a class="download-btn" id="downloadLink" download>下载这首歌曲</a>
+  </div>
+
+  <!-- 相册区域 -->
+  <div class="section" id="albumSection">
+    <h3>📸 相册</h3>
+    <div class="photo-grid" id="photoList"></div>
+    <textarea id="msgText" placeholder="写给粉丝的寄语（展示在相册下方）" rows="4"></textarea>
+    <div id="msgBox" style="margin-top:16px;white-space:pre-line;opacity:0.9;"></div>
+  </div>
+
+  <!-- 歌曲列表 -->
+  <div class="section" id="songListSection">
+    <h3>📀 歌曲列表</h3>
+    <div id="songList"></div>
+  </div>
+
+  <!-- 你的后台管理面板（粉丝访问看不到，只有你用来添加素材） -->
+  <div class="section admin-panel">
+    <h3>🔧 管理后台（仅你使用）</h3>
+    <p style="opacity:0.7">添加素材，拿到永久链接后，替换代码内的地址，再上传托管平台</p>
+    <input type="file" id="bgInput" accept="image/*">
+    <button onclick="setBackground()">设置网页背景</button>
+    <input type="text" id="songName" placeholder="歌曲名称">
+    <input type="text" id="songCoverUrl" placeholder="封面图片网络地址">
+    <input type="text" id="songAudioUrl" placeholder="MP3音频网络地址">
+    <button onclick="addSong()">添加歌曲</button>
+    <input type="text" id="photoUrl" placeholder="相册图片网络地址">
+    <button onclick="addPhoto()">添加相册照片</button>
+  </div>
+</div>
+
+<script>
+// ========== 【重要！上线前在这里填入你的素材网络链接】==========
+// 示例格式，全部替换成你上传图片/mp3之后拿到的外网URL
+const siteBaseUrl = "https://xxx.vercel.app"; // 你部署后的网站域名
+let songData = [
+  {
+    id:"song01",
+    name:"歌曲1",
+    cover:"https://xxx/cover1.jpg",
+    audio:"https://xxx/song1.mp3"
+  }
+];
+let photoData = [
+  "https://xxx/photo1.jpg"
+];
+let fanMessage = "致我的粉丝：感谢一路陪伴，希望这首歌能带给你温暖。";
+// ============================================================
+
+const params = new URLSearchParams(window.location.search);
+const targetSongId = params.get("song");
+document.getElementById("msgBox").innerText = fanMessage;
+
+// 渲染相册
+function renderPhoto(){
+  const wrap = document.getElementById("photoList");
+  wrap.innerHTML = "";
+  photoData.forEach(url=>{
+    const img = document.createElement("img");
+    img.src = url;
+    wrap.appendChild(img);
+  })
+}
+
+// 渲染歌曲列表
+function renderSongList(){
+  const wrap = document.getElementById("songList");
+  wrap.innerHTML = "";
+  songData.forEach(song=>{
+    const songPageUrl = `${siteBaseUrl}/?song=${song.id}`;
+    const div = document.createElement("div");
+    div.className = "song-item";
+    div.innerHTML = `
+      <img class="song-cover" src="${song.cover}">
+      <div class="song-info">
+        <div class="song-name">${song.name}</div>
+        <div class="link-row">
+          <input value="${songPageUrl}" readonly>
+          <button onclick="copyText(this)">复制链接</button>
+        </div>
+      </div>
+    `;
+    wrap.appendChild(div);
+  })
+}
+
+// 复制链接
+function copyText(btn){
+  const val = btn.previousElementSibling.value;
+  navigator.clipboard.writeText(val);
+  alert("歌曲链接已复制！可以写入NFC标签");
+}
+
+// 设置背景
+function setBackground(){
+  const file = document.getElementById("bgInput").files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  document.body.style.backgroundImage = `url(${url})`;
+}
+
+// 添加歌曲（本地预览，上线需要替换成网络地址）
+function addSong(){
+  const name = document.getElementById("songName").value.trim();
+  const cover = document.getElementById("songCoverUrl").value.trim();
+  const audio = document.getElementById("songAudioUrl").value.trim();
+  if(!name || !cover || !audio){alert("请填写全部链接");return;}
+  const id = Date.now().toString();
+  songData.push({id,name,cover,audio});
+  renderSongList();
+}
+function addPhoto(){
+  const url = document.getElementById("photoUrl").value.trim();
+  if(!url){return;}
+  photoData.push(url);
+  renderPhoto();
+}
+
+// 单曲播放页逻辑（NFC跳转 ?song=xxx）
+function loadSingleSong(songId){
+  const song = songData.find(item=>item.id === songId);
+  if(!song) return;
+  // 隐藏首页内容，只显示播放器
+  document.getElementById("albumSection").style.display="none";
+  document.getElementById("songListSection").style.display="none";
+  document.querySelector(".admin-panel").style.display="none";
+  const playerView = document.getElementById("playerView");
+  playerView.style.display="block";
+
+  document.getElementById("mainCover").src = song.cover;
+  document.getElementById("playerSongName").innerText = song.name;
+  const audioEl = document.getElementById("mainAudio");
+  audioEl.src = song.audio;
+  const downloadBtn = document.getElementById("downloadLink");
+  downloadBtn.href = song.audio;
+  downloadBtn.download = song.name+".mp3";
+
+  const vinylDom = document.getElementById("vinyl");
+  const playBtn = document.getElementById("bigPlayBtn");
+
+  playBtn.onclick = function(){
+    audioEl.play();
+  }
+  audioEl.onplay = ()=> vinylDom.classList.add("playing");
+  audioEl.onpause = ()=> vinylDom.classList.remove("playing");
+}
+
+window.onload = function(){
+  renderPhoto();
+  renderSongList();
+  if(targetSongId){
+    loadSingleSong(targetSongId);
+  }
+}
+</script>
+</body>
+</html>
